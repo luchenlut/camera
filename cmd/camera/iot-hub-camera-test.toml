@@ -1,0 +1,22 @@
+[general]
+log_level = 5
+log_path = "/var/log/golang"
+name = "camera-gateway-bridge"
+addr = "192.168.1.64:80"
+username = "admin"
+password = "ADMIN123"
+snapshot_path = "D://workspace/go/src/snapshot"
+
+[camera]
+rpc_server="192.168.1.9:7028"
+mqtt_server="tcp://192.168.1.6:1883"
+mqtt_username="root"
+mqtt_password="0b32b351-9c3b-44e4-892d-8ab89ce3775c"
+
+[file_server]
+url="http://192.168.1.9:9096/v1.0/file"
+
+[redis]
+url="redis://root:radacat1234@120.78.198.217:6379/0"
+max_idle=30
+max_active=30
