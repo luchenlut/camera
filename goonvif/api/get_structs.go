@@ -1,10 +1,10 @@
 package api
 
 import (
-	"iot-hub/camera/goonvif/PTZ"
+	"camera/goonvif/Device"
+	"camera/goonvif/Media"
+	"camera/goonvif/PTZ"
 	"errors"
-	"iot-hub/camera/goonvif/Device"
-	"iot-hub/camera/goonvif/Media"
 )
 
 func getPTZStructByName(name string) (interface{}, error) {
@@ -257,8 +257,6 @@ func getDeviceStructByName(name string) (interface{}, error) {
 	}
 }
 
-
-
 func getMediaStructByName(name string) (interface{}, error) {
 	switch name {
 	case "GetServiceCapabilities":
@@ -342,7 +340,7 @@ func getMediaStructByName(name string) (interface{}, error) {
 	case "GetMetadataConfiguration":
 		return &Media.GetMetadataConfiguration{}, nil
 	case "GetAudioOutputConfiguration":
-		return &Media.GetAudioOutputConfiguration{},nil
+		return &Media.GetAudioOutputConfiguration{}, nil
 	case "GetAudioDecoderConfiguration":
 		return &Media.GetAudioDecoderConfiguration{}, nil
 	case "GetCompatibleVideoEncoderConfigurations":

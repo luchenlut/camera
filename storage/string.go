@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"camera/config"
 	"github.com/garyburd/redigo/redis"
 	"github.com/pkg/errors"
-	"iot-hub/camera/config"
 )
 
 func Get(key string) (interface{}, error) {

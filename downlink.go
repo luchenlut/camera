@@ -2,21 +2,19 @@ package camera
 
 import (
 	"bytes"
+	"camera/config"
+	"camera/goonvif/Device"
+	"camera/goonvif/Media"
+	"camera/goonvif/PTZ"
+	"camera/goonvif/xsd"
+	"camera/goonvif/xsd/onvif"
+	"camera/ptz"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
-	"iot-hub/api"
-	"iot-hub/camera/config"
-	"iot-hub/camera/goonvif/Device"
-	"iot-hub/camera/goonvif/Media"
-	"iot-hub/camera/goonvif/PTZ"
-	"iot-hub/camera/goonvif/xsd"
-	"iot-hub/camera/goonvif/xsd/onvif"
-	"iot-hub/camera/ptz"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -66,16 +64,8 @@ func handlerCameraChan(b *Backend) {
 // 采集下行命令处理报文
 func collectCameraPacket(p DevicePayload) {
 	logrus.Println("采集下行命令处理报文")
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
-	resp, err := asset.GetDevice(ctx, &api.GetDeviceRequest{Did: p.Did, Offline: true})
-	//resp, err := command.GetDeviceForID(ctx, &api.GetDeviceForIDRequest{ID: p.Did})
-
-	if err != nil {
-		logrus.Errorf("get device rpc error %v", err)
-		return
-	}
-	entry := NewEntry(Fields{"tid": resp.Tid, "pid": resp.Pid, "did": resp.Did})
-	//entry := NewEntry(Fields{"did": p.Did})
+	entry := NewEntry(Fields{"did": p.Did})
+	did = p.Did
 
 	responseTwins := &ResponseTwins{}
 	if err := json.Unmarshal(p.Payload, &responseTwins); err != nil {
@@ -84,21 +74,25 @@ func collectCameraPacket(p DevicePayload) {
 	}
 
 	entry.DownLink("receive down data from mqtt this shuncom gateway %s", string(p.Payload))
-
-	command.UpdateCommandState(ctx, &api.UpdateCommandStateRequest{Cid: responseTwins.CommandID, State: ACK})
-	if err := handlerCameraDownLink(responseTwins, p.Did); err != nil {
+	if err := handlerCameraDownLink(responseTwins); err != nil {
 		entry.Error("send data to shuncom gateway %v", err)
-		command.UpdateCommandState(ctx, &api.UpdateCommandStateRequest{Cid: responseTwins.CommandID, State: FAILED})
-	} else {
-		command.UpdateCommandState(ctx, &api.UpdateCommandStateRequest{Cid: responseTwins.CommandID, State: SUCCESS})
 	}
 }
 
+// 记录设备ID
+var did string
+
+// 记录视频流URL
+var streamUrl string
+
+// 记录可用预置位集合
+var usablePresetsArray = make([]string, 1)
+
 // 处理下行命令
-func handlerCameraDownLink(resp *ResponseTwins, gwID string) error {
-	entry := logrus.WithFields(logrus.Fields{"Did": gwID})
+func handlerCameraDownLink(resp *ResponseTwins) error {
+	entry := logrus.WithFields(logrus.Fields{"Did": did})
 	var send error
-	if  resp.CommandID != "" {
+	if resp.CommandID != "" {
 		for desK, desV := range resp.Payload.State.Desired {
 			entry.Debugf("接收到下发命令 %v:%v", desK, desV)
 			switch desK {
@@ -207,7 +201,7 @@ func PTZControlMove(UpOrDown, LeftOrRight, Zoom int8, Angle float64) error {
 	start := time.Now()
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"PTZControlMove err")
+		return errors.Wrap(err, "PTZControlMove err")
 	}
 	logrus.Println("camera.GetProfiles(): ", time.Now().Sub(start))
 
@@ -219,7 +213,7 @@ func PTZControlMove(UpOrDown, LeftOrRight, Zoom int8, Angle float64) error {
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZControlMove err")
+		return errors.Wrap(err, "PTZControlMove err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -232,14 +226,14 @@ func SnapshotUri() error {
 	camera := &ptz.Camera{Addr: config.C.General.Addr, Username: config.C.General.Username, Password: config.C.General.Password}
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"SnapshotUri err")
+		return errors.Wrap(err, "SnapshotUri err")
 	}
 
 	resp, err := camera.Media_GetSnapshotUri(profiles.Profiles.Token)
 	res := Media.GetSnapshotUriResponse{}
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
-		return errors.Wrap(err,"SnapshotUri err")
+		return errors.Wrap(err, "SnapshotUri err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -319,7 +313,7 @@ func PTZSetPreset(presetToken float64) error {
 	profiles, err := camera.GetProfiles()
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZSetPreset err")
+		return errors.Wrap(err, "PTZSetPreset err")
 	}
 
 	presetToken4Float := strconv.FormatFloat(presetToken, 'f', -1, 64)
@@ -330,7 +324,7 @@ func PTZSetPreset(presetToken float64) error {
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZSetPreset err")
+		return errors.Wrap(err, "PTZSetPreset err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -343,7 +337,7 @@ func PTZGetPresets() error {
 	camera := &ptz.Camera{Addr: config.C.General.Addr, Username: config.C.General.Username, Password: config.C.General.Password}
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"PTZGetPresets err")
+		return errors.Wrap(err, "PTZGetPresets err")
 	}
 
 	resp, err := camera.PTZ_GetPresets(profiles.Profiles.Token)
@@ -354,7 +348,7 @@ func PTZGetPresets() error {
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZGetPresets err")
+		return errors.Wrap(err, "PTZGetPresets err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -368,7 +362,7 @@ func PTZRemovePresets(presetToken float64) error {
 	profiles, err := camera.GetProfiles()
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZRemovePresets err")
+		return errors.Wrap(err, "PTZRemovePresets err")
 	}
 
 	resp, err := camera.PTZ_RemovePreset(profiles.Profiles.Token, strconv.FormatFloat(presetToken, 'f', -1, 64))
@@ -377,7 +371,7 @@ func PTZRemovePresets(presetToken float64) error {
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
 		logrus.Println(err)
-		return errors.Wrap(err,"PTZRemovePresets err")
+		return errors.Wrap(err, "PTZRemovePresets err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -390,14 +384,14 @@ func PTZGotoPreset(presetToken float64) error {
 	camera := &ptz.Camera{Addr: config.C.General.Addr, Username: config.C.General.Username, Password: config.C.General.Password}
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"GetProfiles err")
+		return errors.Wrap(err, "GetProfiles err")
 	}
 
 	resp, err := camera.PTZ_GotoPreset(profiles.Profiles.Token, strconv.FormatFloat(presetToken, 'f', -1, 64))
 	res := PTZ.GotoPresetResponse{}
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
-		return errors.Wrap(err,"PTZ_GotoPreset err")
+		return errors.Wrap(err, "PTZ_GotoPreset err")
 	}
 	b, _ := json.Marshal(res)
 	logrus.Println("PTZGotoPresetResponse:", string(b))
@@ -409,7 +403,7 @@ func PTZSetHomePosition() error {
 	camera := &ptz.Camera{Addr: config.C.General.Addr, Username: config.C.General.Username, Password: config.C.General.Password}
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"PTZSetHomePosition err")
+		return errors.Wrap(err, "PTZSetHomePosition err")
 	}
 
 	resp, err := camera.PTZ_SetHomePosition(profiles.Profiles.Token)
@@ -417,7 +411,7 @@ func PTZSetHomePosition() error {
 	res := PTZ.SetHomePositionResponse{}
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
-		return errors.Wrap(err,"PTZSetHomePosition err")
+		return errors.Wrap(err, "PTZSetHomePosition err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -430,7 +424,7 @@ func PTZGotoHomePosition() error {
 	camera := &ptz.Camera{Addr: config.C.General.Addr, Username: config.C.General.Username, Password: config.C.General.Password}
 	profiles, err := camera.GetProfiles()
 	if err != nil {
-		return errors.Wrap(err,"PTZGotoHomePosition err")
+		return errors.Wrap(err, "PTZGotoHomePosition err")
 	}
 
 	resp, err := camera.PTZ_GotoHomePosition(profiles.Profiles.Token)
@@ -438,7 +432,7 @@ func PTZGotoHomePosition() error {
 	res := PTZ.GotoHomePositionResponse{}
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
-		return errors.Wrap(err,"PTZGotoHomePosition err")
+		return errors.Wrap(err, "PTZGotoHomePosition err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -458,7 +452,7 @@ func DeviceSetSystemDateAndTime() error {
 
 	err = ptz.ParseResponse(resp, &res)
 	if err != nil {
-		return errors.Wrap(err,"SetSystemDateAndTime err")
+		return errors.Wrap(err, "SetSystemDateAndTime err")
 	}
 
 	b, _ := json.Marshal(res)
@@ -469,4 +463,3 @@ func DeviceSetSystemDateAndTime() error {
 
 	return nil
 }
-

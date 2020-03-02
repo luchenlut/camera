@@ -1,9 +1,9 @@
 package ptz
 
 import (
-	"iot-hub/camera/goonvif/PTZ"
-	"iot-hub/camera/goonvif/xsd"
-	"iot-hub/camera/goonvif/xsd/onvif"
+	"camera/goonvif/PTZ"
+	"camera/goonvif/xsd"
+	"camera/goonvif/xsd/onvif"
 	"net/http"
 )
 

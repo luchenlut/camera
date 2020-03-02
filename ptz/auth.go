@@ -1,12 +1,12 @@
 package ptz
 
 import (
+	"camera/goonvif"
+	"camera/goonvif/Media"
+	"camera/gosoap"
 	"encoding/xml"
 	log "github.com/sirupsen/logrus"
-	"iot-hub/camera/goonvif"
-	"iot-hub/camera/goonvif/Media"
 	"io/ioutil"
-	"iot-hub/camera/gosoap"
 	"net/http"
 )
 

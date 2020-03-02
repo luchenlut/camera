@@ -1,15 +1,15 @@
 package main
 
 import (
+	"camera"
+	"camera/config"
+	"camera/echo"
+	"camera/goonvif"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"iot-hub/camera"
-	"iot-hub/camera/config"
-	"iot-hub/camera/echo"
-	"iot-hub/camera/goonvif"
-	"iot-hub/camera/storage"
+
 	"os"
 	"os/signal"
 	"path"
@@ -20,10 +20,8 @@ import (
 func run(cmd *cobra.Command, args []string) error {
 	tasks := []func() error{
 		setLogLevel,
-		setRedisPool,
 		setMQTT,
 		setIntervalCheck,
-		setRPC,
 	}
 
 	for _, t := range tasks {
@@ -148,16 +146,16 @@ func setMQTT() error {
 
 func setIntervalCheck() error {
 	go func() {
-		for  {
+		for {
 			t := time.NewTicker(time.Second * 60)
 			select {
 			case <-t.C:
 				// check
 				dev, _ := goonvif.NewDevice(config.C.General.Addr)
-				if dev == nil{
+				if dev == nil {
 					go camera.HandleIntervalCheck("offline(离线)", camera.HandleInterval)
 					//fmt.Println("offline")
-				}else{
+				} else {
 					go camera.HandleIntervalCheck("online(在线)", camera.HandleInterval)
 					//fmt.Println("online")
 				}
@@ -165,39 +163,5 @@ func setIntervalCheck() error {
 		}
 
 	}()
-	return nil
-}
-
-func setRPC() error {
-	log.WithFields(log.Fields{
-		"server": config.C.Camera.RPCServer,
-	}).Info("connecting to rpc")
-
-	camera.NewAssetRPCClient(config.C.Camera.RPCServer)
-
-	return nil
-}
-
-/*设置redis连接池*/
-func setRedisPool() error {
-	if config.C.Redis.MaxIdle != 0 {
-		storage.RedisMaxIdle = config.C.Redis.MaxIdle
-	}
-	if config.C.Redis.MaxActive != 0 {
-		storage.RedisMaxActive = config.C.Redis.MaxActive
-	}
-	log.WithFields(log.Fields{
-		"url":        config.C.Redis.URL,
-		"max_idle":   storage.RedisMaxIdle,
-		"max_active": storage.RedisMaxActive,
-	}).Info("connecting to redis database")
-	config.C.Redis.Pool = storage.NewRedisPool(config.C.Redis.URL)
-	c := config.C.Redis.Pool.Get()
-	defer c.Close()
-
-	_, err := c.Do("PING")
-	if err != nil {
-		return errors.Wrap(err, "ping redis error")
-	}
 	return nil
 }

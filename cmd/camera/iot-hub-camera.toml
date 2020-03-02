@@ -9,15 +9,9 @@ snapshot_path = "D://workspace/go/src/snapshot"
 
 
 [camera]
-rpc_server="120.78.213.22:7028"
-mqtt_server="tcp://120.78.213.22:1883"
+mqtt_server="tcp://127.0.0.1:1883"
 mqtt_username="root"
 mqtt_password="0b32b351-9c3b-44e4-892d-8ab89ce3775c"
 
 [file_server]
-url="https://api.alinktech.com/v1.0/file"
-
-[redis]
-url="redis://root:radacat1234@120.78.198.217:6379/0"
-max_idle=30
-max_active=30
+url="https://127.0.0.1:9096/v1.0/file"

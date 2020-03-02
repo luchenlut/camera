@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"camera/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io/ioutil"
-	"iot-hub/camera/config"
 	_ "net/http/pprof"
 	"runtime"
 )
@@ -55,7 +55,7 @@ func initConfig() {
 		viper.SetConfigName("iot-hub")
 		viper.AddConfigPath(".")
 		viper.AddConfigPath("$HOME/.config/iot-hub")
-		viper.AddConfigPath("/etc/iot-hub/")
+		viper.AddConfigPath("/etc/")
 		if err := viper.ReadInConfig(); err != nil {
 			switch err.(type) {
 			case viper.ConfigFileNotFoundError:
